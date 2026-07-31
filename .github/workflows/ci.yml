@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Builds, validates all output schemas, then drives the server over stdio.
+      # Fully offline — the smoke test stubs the Toss API locally.
+      - name: Test
+        run: npm test
+
+      - name: Verify read-only mode omits the trading tools
+        run: node test/smoke.mjs --read-only
+
+  docker:
+    name: Build image
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # arm64 emulation, for Synology/QNAP units that are not x86.
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Pull requests build to validate the Dockerfile but never publish.
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  smoke-image:
+    name: Smoke-test image
+    needs: docker
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Proves the published image actually boots, serves /health, and enforces
+      # bearer auth on /mcp — the checks that matter before deploying to a NAS.
+      - name: Run container and probe it
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}:sha-$(echo ${GITHUB_SHA} | cut -c1-7)"
+          docker run -d --name mcp -p 3000:3000 \
+            -e TOSSINVEST_ACCESS_TOKEN=dummy \
+            -e MCP_AUTH_TOKEN=ci-token-0123456789abcdef \
+            -e TOSSINVEST_READ_ONLY=true \
+            "${IMAGE}"
+
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:3000/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          echo "== health =="
+          curl -fsS http://127.0.0.1:3000/health
+
+          echo "== /mcp must reject an unauthenticated request =="
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:3000/mcp \
+            -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}')
+          test "$code" = "401" || { echo "expected 401, got $code"; docker logs mcp; exit 1; }
+
+          echo "== /mcp must serve an authenticated request =="
+          curl -fsS -X POST http://127.0.0.1:3000/mcp \
+            -H 'Authorization: Bearer ci-token-0123456789abcdef' \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
+            | grep -q tossinvest_get_prices || { docker logs mcp; exit 1; }
+
+          echo "OK"
+          docker rm -f mcp

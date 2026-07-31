@@ -1,10 +1,36 @@
 /**
- * Smoke test: spawn the built server over stdio, initialize, list tools,
- * and verify schemas/annotations. Uses a dummy token — no API calls are made.
+ * Smoke test: spawn the built server over stdio, initialize, list tools, verify
+ * schemas/annotations, and check the error and input-validation paths.
+ *
+ * Hermetic by design — the server is pointed at a local stub that answers with a
+ * Toss-shaped error envelope, so the test never touches the real API and runs
+ * identically offline and in CI.
  */
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 
-const env = { ...process.env, TOSSINVEST_ACCESS_TOKEN: "dummy-token" };
+// Stub standing in for openapi.tossinvest.com: always replies with the
+// documented 401 error envelope so the error mapping can be exercised.
+const stub = createServer((req, res) => {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(
+        JSON.stringify({
+            error: {
+                requestId: "01HXYZABCDEFG123456789",
+                code: "invalid-token",
+                message: "유효하지 않은 토큰입니다."
+            }
+        })
+    );
+});
+await new Promise((resolve) => stub.listen(0, "127.0.0.1", resolve));
+const stubUrl = `http://127.0.0.1:${stub.address().port}`;
+
+const env = {
+    ...process.env,
+    TOSSINVEST_ACCESS_TOKEN: "dummy-token",
+    TOSSINVEST_API_BASE_URL: stubUrl
+};
 if (process.argv.includes("--read-only")) env.TOSSINVEST_READ_ONLY = "true";
 
 const child = spawn("node", ["dist/index.js"], { env, stdio: ["pipe", "pipe", "pipe"] });
@@ -68,16 +94,34 @@ for (const tool of tools) {
     if (issues.length) problems++;
 }
 
-// Exercise the error path: a bogus token must yield a readable message, not a crash.
+// Exercise the error path: a rejected token must yield a readable message with a
+// recovery step, not a crash or a raw envelope.
 const call = await send("tools/call", { name: "tossinvest_get_prices", arguments: { symbols: "005930" } });
+const errorText = call.result?.content?.[0]?.text ?? JSON.stringify(call);
 console.log("\nerror-path isError:", call.result?.isError);
-console.log("error-path text:\n" + (call.result?.content?.[0]?.text ?? JSON.stringify(call)));
+console.log("error-path text:\n" + errorText);
+if (!call.result?.isError) {
+    console.log("⚠ expected isError on a 401 response");
+    problems++;
+}
+for (const expected of ["invalid-token", "Next step:", "01HXYZABCDEFG123456789"]) {
+    if (!errorText.includes(expected)) {
+        console.log(`⚠ error text missing "${expected}"`);
+        problems++;
+    }
+}
 
 // Client-side validation must reject a bad symbol before any network call.
 const bad = await send("tools/call", { name: "tossinvest_get_prices", arguments: { symbols: "005930 AAPL!" } });
 console.log("\nvalidation isError:", bad.result?.isError ?? Boolean(bad.error));
 console.log("validation text:", (bad.result?.content?.[0]?.text ?? bad.error?.message ?? "").slice(0, 200));
 
+if (!(bad.result?.isError ?? Boolean(bad.error))) {
+    console.log("⚠ expected a validation error for a malformed symbol list");
+    problems++;
+}
+
 console.log(`\nproblem tools: ${problems}`);
 child.kill();
+stub.close();
 process.exit(problems === 0 ? 0 : 1);

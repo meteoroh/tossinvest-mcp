@@ -1,5 +1,9 @@
 services:
   tossinvest-mcp:
+    # To use the image published by CI instead of building locally, drop the
+    # `build` line and point `image` at GHCR — handy on a NAS that shouldn't
+    # compile TypeScript:
+    #   image: ghcr.io/meteoroh/tossinvest-mcp:latest
     build: .
     image: tossinvest-mcp-server:1.0.0
     container_name: tossinvest-mcp

@@ -73,6 +73,12 @@ cp .env.example .env   # fill in credentials + MCP_AUTH_TOKEN, then:
 docker compose up -d --build
 ```
 
+CI publishes a multi-arch image (`linux/amd64` + `linux/arm64`) to GHCR on every push to `main`. To use it instead of building on the NAS, drop the `build:` line from `docker-compose.yml` and set:
+
+```yaml
+image: ghcr.io/meteoroh/tossinvest-mcp:latest
+```
+
 The bundled `docker-compose.yml` defaults to the conservative setup: read-only mode on, port published to `127.0.0.1` only, container runs unprivileged with a read-only root filesystem and all capabilities dropped. Reach it over a VPN (Tailscale/WireGuard), a Cloudflare Tunnel, or a TLS-terminating reverse proxy rather than publishing it to the internet.
 
 Note that the Toss API allow-lists by IP, so the NAS's public IP must be registered under **허용 IP 관리** — a different IP than your laptop's. Fronting the server with a tunnel or proxy does not change this: outbound calls to Toss still leave from the NAS.
