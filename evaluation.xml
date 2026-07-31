@@ -6,11 +6,16 @@
   data (symbol master attributes, catalog membership, documented order
   semantics) rather than live quotes, so answers do not drift between runs.
 
-  Verification status: these were authored from the Toss Securities OpenAPI
-  specification (v1.2.5) and its documented reference values. They have NOT been
-  executed against the live API, because no Open API credentials are configured
-  in this environment. Re-run them once TOSSINVEST_CLIENT_ID / _SECRET are set
-  and correct any answer the live API contradicts.
+  Verification status: VERIFIED against the live Toss Securities Open API on
+  2026-07-31 via the deployed MCP server. Every answer below was confirmed by
+  actually calling the tools — the reference-data answers against
+  tossinvest_get_stocks, the bond-interval answer against
+  tossinvest_get_market_indicator_candles (which returned
+  400 invalid-request with allowedValues ["1d"]), and the investor-flow answer
+  against tossinvest_get_investor_trading.
+
+  Note: sharesOutstanding is deliberately not used as an answer anywhere — it
+  drifts with buybacks and issuance, unlike the attributes below.
 -->
 <evaluation>
   <qa_pair>
