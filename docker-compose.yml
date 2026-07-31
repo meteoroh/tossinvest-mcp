@@ -18,9 +18,15 @@ services:
     env_file:
       - .env
 
+    # Values here OVERRIDE anything with the same name in .env — that is why the
+    # safety-critical flag lives here rather than in the env file, where a stray
+    # edit could silently enable trading.
     environment:
       TRANSPORT: http
       PORT: "3000"
+      # Bind inside the container. Must stay 0.0.0.0 or the `ports` mapping
+      # below has nothing to forward to; host-side exposure is controlled by
+      # `ports`, not by this.
       HOST: 0.0.0.0
       # Drop to "false" only in a deployment you specifically want to trade from.
       TOSSINVEST_READ_ONLY: "true"
