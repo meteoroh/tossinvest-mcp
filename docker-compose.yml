@@ -9,11 +9,15 @@ services:
     container_name: tossinvest-mcp
     restart: unless-stopped
 
+    # host:container. Only the HOST side can collide with other NAS services —
+    # the container side is namespaced and never conflicts, so leave it at 3000.
+    # Override the host port with MCP_HOST_PORT in .env if 3939 is taken.
+    #
     # Bound to loopback on purpose: reach it over Tailscale/WireGuard, or put a
-    # TLS-terminating reverse proxy in front. Change to "3000:3000" only if you
-    # understand that it then answers on every NAS interface.
+    # TLS-terminating reverse proxy in front. Drop the 127.0.0.1 prefix only if
+    # you understand that it then answers on every NAS interface.
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${MCP_HOST_PORT:-3939}:3000"
 
     env_file:
       - .env

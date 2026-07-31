@@ -64,7 +64,8 @@ MCP_AUTH_TOKEN=$(openssl rand -hex 32) TRANSPORT=http npm start
 | `MCP_AUTH_TOKEN` | Bearer token clients must present. Minimum 16 chars; compared in constant time |
 | `MCP_ALLOW_ANONYMOUS` | `true` disables auth (prints a warning) |
 | `HOST` | Bind address, default `0.0.0.0` |
-| `PORT` | Default `3000` |
+| `PORT` | Port the process listens on, default `3000` |
+| `MCP_HOST_PORT` | Compose only: host port published on the NAS, default `3939`. The container's own port stays `3000` |
 
 #### Docker / NAS
 
@@ -93,7 +94,7 @@ Otherwise, `docker-compose.npm.yml` overlays the networking needed to sit behind
 docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build
 ```
 
-The base file publishes `127.0.0.1:3000`, which NPM **cannot** reach — inside NPM's container, `127.0.0.1` is NPM itself. The overlay drops the host port and joins NPM's network instead, so NPM reaches the server by container name. Find that network with:
+The base file publishes on loopback, which NPM **cannot** reach — inside NPM's container, `127.0.0.1` is NPM itself. The overlay drops the host port entirely and joins NPM's network instead, so NPM reaches the server by container name on its internal port `3000` (host port collisions are irrelevant here, since nothing is published). Find that network with:
 
 ```bash
 docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
