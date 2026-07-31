@@ -85,7 +85,9 @@ Note that the Toss API allow-lists by IP, so the NAS's public IP must be registe
 
 #### Nginx Proxy Manager
 
-`docker-compose.npm.yml` overlays the networking needed to sit behind an existing NPM instance.
+For Portainer stacks or Synology Container Manager — which accept only one file — use the flattened, self-contained [`examples/docker-compose.npm.yml`](examples/docker-compose.npm.yml). It pulls the published image, so the NAS never compiles anything.
+
+Otherwise, `docker-compose.npm.yml` overlays the networking needed to sit behind an existing NPM instance.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build

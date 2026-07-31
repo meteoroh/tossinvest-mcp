@@ -1,0 +1,96 @@
+# Self-contained compose file for running behind Nginx Proxy Manager.
+#
+# Flattened on purpose: Portainer stacks and Synology Container Manager accept
+# only one file, so the base + overlay pattern used at the repo root does not
+# work there. Everything needed is inline here.
+#
+# Uses the CI-published image, so the NAS never compiles TypeScript.
+#
+# ---------------------------------------------------------------------------
+# 1. Find the docker network Nginx Proxy Manager already runs on:
+#
+#      docker inspect <npm-container> \
+#        -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+#
+#    Substitute it for `npm_default` at the bottom of this file.
+#
+# 2. Provide these variables — via a .env file next to this one, or via
+#    Portainer's stack environment-variables UI:
+#
+#      TOSSINVEST_CLIENT_ID      from 토스증권 WTS > 설정 > Open API
+#      TOSSINVEST_CLIENT_SECRET  same place
+#      MCP_AUTH_TOKEN            openssl rand -hex 32
+#
+# 3. In NPM, add a Proxy Host:
+#      Domain Names:      mcp.yourdomain.com
+#      Scheme:            http
+#      Forward Hostname:  tossinvest-mcp
+#      Forward Port:      3000
+#      SSL:               Let's Encrypt cert, Force SSL on
+#    Do NOT attach an Access List — its Basic Auth collides with the
+#    Authorization header this server reads its bearer token from.
+# ---------------------------------------------------------------------------
+
+services:
+  tossinvest-mcp:
+    image: ghcr.io/meteoroh/tossinvest-mcp:latest
+    container_name: tossinvest-mcp
+    restart: unless-stopped
+
+    environment:
+      # --- transport ---
+      TRANSPORT: http
+      PORT: "3000"
+      # Bind inside the container. Leave as 0.0.0.0: NPM reaches this over the
+      # docker network, and no host port is published at all.
+      HOST: 0.0.0.0
+
+      # --- Toss Securities credentials ---
+      # The `:?` form fails fast with a clear message instead of starting
+      # a half-configured container.
+      TOSSINVEST_CLIENT_ID: ${TOSSINVEST_CLIENT_ID:?set TOSSINVEST_CLIENT_ID}
+      TOSSINVEST_CLIENT_SECRET: ${TOSSINVEST_CLIENT_SECRET:?set TOSSINVEST_CLIENT_SECRET}
+      # Optional: only needed when the credentials hold more than one account.
+      TOSSINVEST_ACCOUNT_SEQ: ${TOSSINVEST_ACCOUNT_SEQ:-}
+
+      # --- MCP endpoint auth (clients send: Authorization: Bearer <this>) ---
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?set MCP_AUTH_TOKEN, e.g. openssl rand -hex 32}
+
+      # --- safety ---
+      # "true" omits every order-placing tool. Change deliberately, not by accident.
+      TOSSINVEST_READ_ONLY: "true"
+
+    # No `ports:` at all. NPM reaches the container by name over the shared
+    # network, so nothing is exposed on the NAS itself.
+    networks:
+      - proxy
+
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  proxy:
+    external: true
+    name: npm_default
