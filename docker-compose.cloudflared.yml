@@ -1,0 +1,41 @@
+# Cloudflare Tunnel overlay.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d
+#
+# cloudflared dials out to Cloudflare, so the NAS needs no inbound port, no port
+# forwarding and no certificate. Cloudflare terminates TLS at the edge and
+# forwards to the MCP container over the internal compose network.
+#
+# Setup:
+#   1. Zero Trust dashboard > Networks > Tunnels > Create a tunnel (Cloudflared).
+#   2. Copy the tunnel token into .env as TUNNEL_TOKEN.
+#   3. Add a Public Hostname on the tunnel:
+#        Subdomain: mcp        Domain: yourdomain.com
+#        Service:   HTTP       URL: tossinvest-mcp:3000
+#   4. Strongly recommended: Zero Trust > Access > Applications > Self-hosted,
+#      covering mcp.yourdomain.com, with a service-token policy. See README.
+
+services:
+  tossinvest-mcp:
+    # The tunnel reaches the container over the compose network, so nothing
+    # needs to be published on the NAS itself.
+    ports: !override []
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tossinvest-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    depends_on:
+      - tossinvest-mcp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

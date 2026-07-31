@@ -1,0 +1,44 @@
+{
+  "name": "tossinvest-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for the Toss Securities (토스증권) Open API — Korean & US market data, account holdings, orders, and conditional orders",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "tossinvest-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node test/output-schemas.mjs && node test/smoke.mjs",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "tossinvest",
+    "toss-securities",
+    "stocks",
+    "trading",
+    "krx"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}

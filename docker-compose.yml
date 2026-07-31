@@ -1,0 +1,37 @@
+services:
+  tossinvest-mcp:
+    build: .
+    image: tossinvest-mcp-server:1.0.0
+    container_name: tossinvest-mcp
+    restart: unless-stopped
+
+    # Bound to loopback on purpose: reach it over Tailscale/WireGuard, or put a
+    # TLS-terminating reverse proxy in front. Change to "3000:3000" only if you
+    # understand that it then answers on every NAS interface.
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    env_file:
+      - .env
+
+    environment:
+      TRANSPORT: http
+      PORT: "3000"
+      HOST: 0.0.0.0
+      # Drop to "false" only in a deployment you specifically want to trade from.
+      TOSSINVEST_READ_ONLY: "true"
+
+    # Nothing here needs to write to disk or gain privileges.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

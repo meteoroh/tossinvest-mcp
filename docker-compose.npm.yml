@@ -1,0 +1,37 @@
+# Nginx Proxy Manager overlay.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.npm.yml up -d --build
+#
+# Joins the network Nginx Proxy Manager already runs on, so NPM can reach this
+# container by name. The base file publishes 127.0.0.1:3000, which NPM CANNOT
+# reach — inside NPM's container, 127.0.0.1 is NPM itself — so the overlay drops
+# the host port entirely and relies on container-to-container networking.
+#
+# Find your NPM network name:
+#   docker inspect <npm-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}'
+# then set it in .env, e.g.  NPM_NETWORK=npm_default
+#
+# In the NPM UI > Proxy Hosts > Add Proxy Host:
+#   Domain Names:     mcp.yourdomain.com
+#   Scheme:           http
+#   Forward Hostname: tossinvest-mcp
+#   Forward Port:     3000
+#   Block Common Exploits: on
+#   SSL tab:          request a Let's Encrypt cert, Force SSL on
+#
+# Do NOT attach an NPM Access List: its HTTP Basic Auth uses the same
+# `Authorization` header this server reads its bearer token from, and NPM would
+# overwrite it. See README.
+
+services:
+  tossinvest-mcp:
+    # Reachable only from the proxy network, not from the NAS host.
+    ports: !override []
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: ${NPM_NETWORK:-npm_default}

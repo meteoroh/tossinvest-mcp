@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Evaluation set for tossinvest-mcp-server.
+
+  Scope note: every question is read-only and its answer is stable reference
+  data (symbol master attributes, catalog membership, documented order
+  semantics) rather than live quotes, so answers do not drift between runs.
+
+  Verification status: these were authored from the Toss Securities OpenAPI
+  specification (v1.2.5) and its documented reference values. They have NOT been
+  executed against the live API, because no Open API credentials are configured
+  in this environment. Re-run them once TOSSINVEST_CLIENT_ID / _SECRET are set
+  and correct any answer the live API contradicts.
+-->
+<evaluation>
+  <qa_pair>
+    <question>Samsung Electronics trades under two Korean symbols: 005930 and 005935. Look up the reference data for both and identify which one is not a common share (i.e. is the preferred share). Answer with its 6-digit symbol.</question>
+    <answer>005935</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Find the international securities identification number (ISIN) reported for the Korean stock with symbol 005930.</question>
+    <answer>KR7005930003</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>On what date was the Korean stock with symbol 005930 listed? Answer in YYYY-MM-DD format.</question>
+    <answer>1975-06-11</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look up reference data for the symbols 005930 and AAPL in a single request. Which listing market is reported for AAPL?</question>
+    <answer>NASDAQ</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>SK Hynix trades under the Korean symbol 000660. According to its reference data, which market segment is it listed on?</question>
+    <answer>KOSPI</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look up the reference data for the Korean stock with symbol 247540. Which market segment is it listed on?</question>
+    <answer>KOSDAQ</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>What English name does the reference data report for the Korean stock with symbol 005930?</question>
+    <answer>SamsungElec</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Investor-type trading flow data is available for only two of the market indicator symbols. One of them is KOSPI. What is the other one?</question>
+    <answer>KOSDAQ</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Candle data for Korean treasury yield symbols such as KR_BOND_10Y is available at only one interval. Which interval value is rejected for these bond symbols?</question>
+    <answer>1m</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Among the three conditional order types supported for automatic trading, which one requires the first watched condition to be a BUY and the second to be a SELL, with the second only starting to be watched after the first fills? Answer with the type name.</question>
+    <answer>OTO</answer>
+  </qa_pair>
+</evaluation>
